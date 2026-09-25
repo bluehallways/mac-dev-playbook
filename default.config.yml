@@ -65,22 +65,75 @@ homebrew_taps: []
 
 homebrew_cask_appdir: /Applications
 homebrew_cask_apps:
-  - chromedriver
-  - docker
-  - dropbox
-  - firefox
-  - google-chrome
-  - handbrake
-  - licecap
-  - sequel-ace
-  - slack
-  - sublime-text
-  - transmit
+  - caffeine
+  - discord
+  - homebrew-app
+  - minecraft
+  - obs
+  - omnidisksweeper
+  - steam
+  - stats
+  - tailscale
+  - visual-studio-code
+  - vnc-viewer
+  - whatcable
+  - zed
 
 # See `geerlingguy.mac.mas` role documentation for usage instructions.
-mas_installed_apps: []
+mas_installed_apps:
+  - { id: 6502451661, name: "Balatro" }
+  - { id: 1584423325, name: "Bloons TD 6+" }
+  - { id: 1193539993, name: "Brother iPrint&Scan" }
+  - { id: 1639580858, name: "Cult of the Lamb" }
+  - { id: 6753196416, name: "DREDGE+" }
+  - { id: 640199958, name: "Apple Developer" }
+  - { id: 524141863, name: "Jump Desktop" }
+  - { id: 1404636482, name: "Motif" }
+  - { id: 375589283, name: "Parcel" }
+  - { id: 1624835354, name: "PL2303 Serial" }
+  - { id: 1624647909, name: "PL25x3_PL256x Serial" }
+  - { id: 803453959, name: "Slack" }
+  - { id: 6744373452, name: "Civilization VII" }
+  - { id: 899247664, name: "TestFlight" }
+  - { id: 1625907876, name: "TMNT Splintered Fate" }
+  - { id: 1295203466, name: "Windows App" }
 mas_email: ""
 mas_password: ""
+
+# Applications with no Homebrew cask or Mac App Store path, installed by
+# downloading a file (dmg / pkg / zip) and installing it into /Applications.
+# Handled by tasks/manual-apps.yml (see also tasks/manual-app-item.yml).
+#
+#   name:     display name (also used for the /Applications/<name>.app check)
+#   app:      app bundle to install (default: <name>.app)
+#   url:      direct download URL (required for automatic install)
+#   type:     dmg | pkg | zip (default: dmg)
+#   homepage: vendor / download page (shown when no direct URL is available)
+manual_installed_apps:
+  - name: "EasyDMG"
+    url: "https://github.com/jeff-schumann/EasyDMG/releases/download/v2.5.0/EasyDMG.dmg"
+    type: "dmg"
+    homepage: "https://github.com/jeff-schumann/EasyDMG"
+  - name: "Zen"
+    url: "https://github.com/zen-browser/desktop/releases/download/1.22.3b/zen.macos-universal.dmg"
+    type: "dmg"
+    homepage: "https://zen-browser.app"
+  # Commercial / license-gated (Lisano Enterprises) or JS-only download pages, so
+  # a direct file URL could not be captured. Set `url` to the direct file link to
+  # enable automatic install; otherwise the task reports the homepage for a
+  # manual install.
+  - name: "DerbyDMV"
+    url: ""
+    type: "dmg"
+    homepage: "https://grandprix-software-central.com/derbydmv/"
+  - name: "GrandPrix Race Manager"
+    url: ""
+    type: "dmg"
+    homepage: "https://grandprix-software-central.com/gprm/"
+  - name: "Task Manager TMOG"
+    url: ""
+    type: "dmg"
+    homepage: "https://tmog.org"
 
 osx_script: "~/.osx --no-restart"
 

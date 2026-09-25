@@ -1,0 +1,15 @@
+---
+# Install applications that have no Homebrew cask or Mac App Store path.
+#
+# Each entry in `manual_installed_apps` (default.config.yml) is handled by
+# tasks/manual-app-item.yml, which downloads the installer file from the
+# configured direct URL and installs it into /Applications. Apps already
+# present in /Applications are skipped, and entries without a direct URL are
+# reported with their homepage for a manual install.
+
+- name: Install manually-downloaded applications.
+  include_tasks: tasks/manual-app-item.yml
+  loop: "{{ manual_installed_apps | default([]) }}"
+  loop_control:
+    loop_var: manual_app
+    label: "{{ manual_app.name | default(manual_app) }}"

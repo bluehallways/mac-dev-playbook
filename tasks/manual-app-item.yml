@@ -1,0 +1,168 @@
+---
+# Install a single entry from `manual_installed_apps`.
+#
+# Expects the `manual_app` variable set by the include_tasks loop in
+# tasks/manual-apps.yml:
+#   name:     display name (default app bundle: <name>.app)
+#   app:      app bundle to install (default: <name>.app)
+#   url:      direct download URL (required for automatic install)
+#   type:     dmg | pkg | zip (default: dmg)
+#   homepage: vendor page, reported when no direct URL is configured
+
+- name: "{{ manual_app.name }} - check whether already installed."
+  stat:
+    path: "/Applications/{{ manual_app.app | default(manual_app.name ~ '.app') }}"
+  register: manual_app_existing
+
+- name: "{{ manual_app.name }} - record install decision."
+  set_fact:
+    manual_app_needs_install: >-
+      {{ (not manual_app_existing.stat.exists)
+         and ((manual_app.url | default('') | trim | length) > 0) }}
+    manual_app_installer: "/tmp/ansible-manual-apps/{{ manual_app.name | regex_replace('[^A-Za-z0-9._-]', '_') }}.{{ manual_app.type | default('dmg') }}"
+
+- name: "{{ manual_app.name }} - already installed, skipping."
+  debug:
+    msg: "Already present in /Applications - nothing to do."
+  when: manual_app_existing.stat.exists
+
+- name: "{{ manual_app.name }} - manual download required (no direct URL)."
+  debug:
+    msg: >-
+      No direct download URL is configured. Download it manually from
+      {{ manual_app.homepage | default('the vendor website') }} and place
+      it in /Applications, then set `url` in manual_installed_apps to
+      enable automatic installation.
+  when:
+    - not manual_app_existing.stat.exists
+    - (manual_app.url | default('') | trim | length) == 0
+
+# ---------------------------------------------------------------------------
+# Automatic install (runs only when a direct download URL is configured).
+# ---------------------------------------------------------------------------
+
+- name: "{{ manual_app.name }} - ensure staging directory exists."
+  file:
+    path: /tmp/ansible-manual-apps
+    state: directory
+    mode: "0755"
+  when: manual_app_needs_install
+
+- name: "{{ manual_app.name }} - download installer."
+  get_url:
+    url: "{{ manual_app.url }}"
+    dest: "{{ manual_app_installer }}"
+    mode: "0644"
+  when: manual_app_needs_install
+
+# --- dmg --------------------------------------------------------------------
+
+- name: "{{ manual_app.name }} - (dmg) detach any stale mount."
+  command: hdiutil detach /tmp/ansible-manual-apps/mnt
+  ignore_errors: true
+  changed_when: false
+  when:
+    - manual_app_needs_install
+    - manual_app.type | default('dmg') == 'dmg'
+
+- name: "{{ manual_app.name }} - (dmg) ensure mount point is free."
+  file:
+    path: /tmp/ansible-manual-apps/mnt
+    state: absent
+  when:
+    - manual_app_needs_install
+    - manual_app.type | default('dmg') == 'dmg'
+
+- name: "{{ manual_app.name }} - (dmg) mount disk image."
+  command: "hdiutil attach -nobrowse -noverify -mountpoint /tmp/ansible-manual-apps/mnt {{ manual_app_installer }}"
+  register: manual_app_dmg_attach
+  changed_when: true
+  when:
+    - manual_app_needs_install
+    - manual_app.type | default('dmg') == 'dmg'
+
+- name: "{{ manual_app.name }} - (dmg) locate app bundle(s) in volume."
+  find:
+    paths: /tmp/ansible-manual-apps/mnt
+    file_type: directory
+    patterns: "*.app"
+  register: manual_app_dmg_apps
+  when:
+    - manual_app_needs_install
+    - manual_app.type | default('dmg') == 'dmg'
+
+- name: "{{ manual_app.name }} - (dmg) verify an app bundle was found."
+  assert:
+    that: "{{ (manual_app_dmg_apps | default({'files': []})).files | length > 0 }}"
+    fail_msg: "No .app bundle found in the mounted image. It may be a package-style installer that this task does not handle - install it manually."
+  when:
+    - manual_app_needs_install
+    - manual_app.type | default('dmg') == 'dmg'
+
+- name: "{{ manual_app.name }} - (dmg) copy app bundle(s) to /Applications."
+  command: "cp -R {{ item.path | quote }} /Applications/"
+  loop: "{{ (manual_app_dmg_apps | default({'files': []})).files }}"
+  changed_when: true
+  when:
+    - manual_app_needs_install
+    - manual_app.type | default('dmg') == 'dmg'
+
+- name: "{{ manual_app.name }} - (dmg) unmount disk image."
+  command: hdiutil detach /tmp/ansible-manual-apps/mnt
+  changed_when: false
+  when:
+    - manual_app_needs_install
+    - manual_app.type | default('dmg') == 'dmg'
+
+# --- pkg --------------------------------------------------------------------
+
+- name: "{{ manual_app.name }} - (pkg) run installer."
+  command: "installer -pkg {{ manual_app_installer | quote }} -target /"
+  changed_when: true
+  when:
+    - manual_app_needs_install
+    - manual_app.type | default('dmg') == 'pkg'
+
+# --- zip --------------------------------------------------------------------
+
+- name: "{{ manual_app.name }} - (zip) extract archive."
+  command: "unzip -o {{ manual_app_installer | quote }} -d /tmp/ansible-manual-apps/zip"
+  changed_when: true
+  when:
+    - manual_app_needs_install
+    - manual_app.type | default('dmg') == 'zip'
+
+- name: "{{ manual_app.name }} - (zip) locate app bundle(s)."
+  find:
+    paths: /tmp/ansible-manual-apps/zip
+    file_type: directory
+    patterns: "*.app"
+    recurse: true
+  register: manual_app_zip_apps
+  when:
+    - manual_app_needs_install
+    - manual_app.type | default('dmg') == 'zip'
+
+- name: "{{ manual_app.name }} - (zip) copy app bundle(s) to /Applications."
+  command: "cp -R {{ item.path | quote }} /Applications/"
+  loop: "{{ (manual_app_zip_apps | default({'files': []})).files }}"
+  changed_when: true
+  when:
+    - manual_app_needs_install
+    - manual_app.type | default('dmg') == 'zip'
+
+# --- cleanup ----------------------------------------------------------------
+
+- name: "{{ manual_app.name }} - remove downloaded installer."
+  file:
+    path: "{{ manual_app_installer }}"
+    state: absent
+  when: manual_app_needs_install
+
+- name: "{{ manual_app.name }} - remove extracted zip contents."
+  file:
+    path: /tmp/ansible-manual-apps/zip
+    state: absent
+  when:
+    - manual_app_needs_install
+    - manual_app.type | default('dmg') == 'zip'
